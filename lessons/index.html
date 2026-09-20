@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>RL Duck 系统学习路径</title>
+  <link rel="stylesheet" href="../assets/course.css">
+</head>
+<body>
+  <nav><a href="../MISSION.md">学习使命</a> · <a href="../RESOURCES.md">资料库</a> · <a href="../reference/glossary.html">术语表</a></nav>
+  <p class="kicker">Course home · RL Duck</p>
+  <h1>从会运行，到会设计实验</h1>
+  <p class="lead">这套路径围绕一条真实工作流展开：本地理解与修改 → Git 固化实验身份 → GPU 服务器训练 → 取回指标与 rollout → 用证据决定下一次单一改动。</p>
+
+  <table>
+    <thead><tr><th>阶段</th><th>你将获得的能力</th><th>状态</th></tr></thead>
+    <tbody>
+      <tr><td>1. 参数到证据</td><td>识别任务/模型/算法/运行四层参数，建立可复现实验闭环</td><td><a href="0001-trace-parameters-to-evidence.html">现在开始</a></td></tr>
+      <tr><td>2. 环境闭环</td><td>沿 61 维观测 → 14 维动作 → 物理步进 → reward 逐行走读</td><td>完成第 1 课练习后生成</td></tr>
+      <tr><td>3. 三种算法</td><td>横向 diff REINFORCE、A2C、PPO，解释每个新增机制解决什么失败</td><td>待学</td></tr>
+      <tr><td>4. 读懂一次 run</td><td>区分训练健康度、任务成绩与行为质量；补齐分项诊断日志</td><td>待学</td></tr>
+      <tr><td>5. 第一次受控实验</td><td>完成 baseline/variant、相同评估、结果摘要与复现实验卡</td><td>待学</td></tr>
+      <tr><td>6. 调参而不乱试</td><td>按症状提出假设，设计单变量/多 seed 实验与停止条件</td><td>待学</td></tr>
+      <tr><td>7. 设计新任务</td><td>定义接口、奖励、终止、课程表、域随机化和不可被钻空子的成功判据</td><td>待学</td></tr>
+      <tr><td>8. 迁移项目</td><td>把 PPO 实验方法迁移到一个由你选择的新动作、机器人或控制问题</td><td>待确定目标</td></tr>
+    </tbody>
+  </table>
+
+  <div class="callout"><strong>节奏：</strong>每课只有一个可验证成果。你提交练习答案后，我会记录已掌握的能力，再生成处于“刚好有挑战”区间的下一课。</div>
+  <p class="small">课程不是固定讲义目录。第 2 课的深度会依据你对第 1 课五个问题和实验卡的回答调整。</p>
+</body>
+</html>

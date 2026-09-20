@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>RL Duck 术语表</title>
+  <link rel="stylesheet" href="../assets/course.css">
+</head>
+<body>
+  <nav><a href="../lessons/index.html">课程首页</a> · <a href="../lessons/0001-trace-parameters-to-evidence.html">第 1 课</a> · <a href="experiment-parameter-map.html">参数地图</a></nav>
+  <p class="kicker">Reference · 持续维护</p>
+  <h1>RL Duck 术语表</h1>
+  <p class="lead">同一个词在不同项目里可能指不同东西。这里固定本课程的用法，后续课程都遵守这张表。</p>
+  <table>
+    <thead><tr><th>术语</th><th>本课程中的精确定义</th><th>本仓落点</th></tr></thead>
+    <tbody>
+      <tr><td>task</td><td>环境配置与训练配方在注册表中的名字，不等于一次实验。</td><td><code>TASK</code> / task ID</td></tr>
+      <tr><td>state</td><td>仿真世界的完整状态；策略通常看不到全部。</td><td>MuJoCo/Mjlab 内部</td></tr>
+      <tr><td>observation</td><td>策略或 critic 每一步实际收到的数值。actor 与 critic 可以不同。</td><td><code>cfg.observations</code></td></tr>
+      <tr><td>action</td><td>策略输出并交给环境执行的 14 维目标量。</td><td><code>cfg.actions</code></td></tr>
+      <tr><td>reward</td><td>单个控制步的标量评分；常由多个加权 term 相加。</td><td><code>cfg.rewards</code></td></tr>
+      <tr><td>return</td><td>从某一步起的折扣累计奖励，是价值函数与策略优化使用的长期量。</td><td><code>reward_to_go</code> / <code>compute_gae</code></td></tr>
+      <tr><td>episode</td><td>从 reset 到终止或超时的一段完整交互。</td><td><code>episode_length_s</code></td></tr>
+      <tr><td>rollout</td><td>用当前策略收集的一批连续交互数据，不必等于完整 episode。</td><td><code>sample_rollout()</code></td></tr>
+      <tr><td>iteration</td><td>本仓中一次“采 24 步 × N 环境，再更新”的外层循环。</td><td>Lightning 的一个 epoch</td></tr>
+      <tr><td>learning epoch</td><td>PPO 对同一 rollout 重排并复用一次；本仓默认 5 次。</td><td><code>num_learning_epochs</code></td></tr>
+      <tr><td>checkpoint</td><td>模型、优化器、迭代号和部分训练设置的快照。</td><td><code>model_N.pt</code></td></tr>
+      <tr><td>curriculum</td><td>随环境步数分阶段改变任务难度或奖励权重的规则。</td><td><code>cfg.curriculum</code></td></tr>
+      <tr><td>domain randomization</td><td>训练时随机改变质量、摩擦、传感器偏差等物理或观测条件。</td><td><code>cfg.events</code></td></tr>
+      <tr><td>seed</td><td>伪随机过程的起点；换 seed 就是一次不同的随机实验。</td><td><code>RL_DUCK_SEED</code></td></tr>
+      <tr><td>ablation</td><td>只移除或改变一个机制，以判断它是否造成观察到的效果。</td><td>实验设计方法</td></tr>
+    </tbody>
+  </table>
+  <p class="small">有术语不清楚时，直接问你的教学助手；确认后把定义补进此表。</p>
+</body>
+</html>

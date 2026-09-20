@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>RL Duck 实验参数地图</title>
+  <link rel="stylesheet" href="../assets/course.css">
+</head>
+<body>
+  <nav><a href="../lessons/index.html">课程首页</a> · <a href="../lessons/0001-trace-parameters-to-evidence.html">第 1 课</a> · <a href="glossary.html">术语表</a></nav>
+  <p class="kicker">Reference · 运行前检查</p>
+  <h1>实验参数地图</h1>
+  <p class="lead">先判断参数属于哪一层，再决定去哪里读、改完要看什么证据。不要从“哪个数字看起来能调”开始。</p>
+
+  <h2>四层参数</h2>
+  <table>
+    <thead><tr><th>层</th><th>它定义什么</th><th>当前声明处</th><th>典型参数</th></tr></thead>
+    <tbody>
+      <tr><td>任务层</td><td>要解决什么问题</td><td>安装的 <code>mjlab_microduck/tasks/*_env_cfg.py</code></td><td>观测、动作、命令、奖励、终止、课程表、随机化</td></tr>
+      <tr><td>模型层</td><td>用什么函数表示策略与价值</td><td><code>code/model.py</code></td><td>隐藏层、ELU、动作初始标准差、观测归一化</td></tr>
+      <tr><td>算法层</td><td>如何用数据更新模型</td><td><code>code/train_v3_ppo.py</code></td><td>gamma、lambda、clip、entropy、lr、KL、minibatch</td></tr>
+      <tr><td>运行层</td><td>这次实验跑多大、跑多久、存哪里</td><td><code>code/env.py</code> 与环境变量</td><td>task、num envs、iterations、seed、save interval、路径</td></tr>
+    </tbody>
+  </table>
+
+  <div class="callout warning"><strong>两个 PPO 配置来源不能混读。</strong> `load_rl_cfg(task)` 返回上游任务随附的 RSL-RL 配方；本仓训练命令实际进入自写的 <code>train_v3_ppo.py</code>。目前两边核心默认值对齐，但真正生效者永远是调用链上的代码。</div>
+
+  <h2>最常调的当前值</h2>
+  <table>
+    <thead><tr><th>参数</th><th>当前值</th><th>作用</th><th>首先观察</th></tr></thead>
+    <tbody>
+      <tr><td><code>NUM_ENVS</code></td><td>4096</td><td>每个控制步并行多少个世界；主要影响吞吐和每轮样本量</td><td>墙钟吞吐、显存、是否 OOM</td></tr>
+      <tr><td><code>MAX_ITERATIONS</code></td><td>6000</td><td>外层采样—更新次数</td><td>是否越过相关 curriculum 阶段</td></tr>
+      <tr><td><code>num_steps_per_env</code></td><td>24</td><td>每轮每个环境采样长度</td><td>batch 大小、curriculum 步数换算</td></tr>
+      <tr><td><code>gamma</code></td><td>0.99</td><td>未来奖励折扣</td><td>return/value 尺度、长短期行为</td></tr>
+      <tr><td><code>lambda</code></td><td>0.95</td><td>GAE 偏差—方差旋钮</td><td>优势噪声、value 依赖</td></tr>
+      <tr><td><code>clip_param</code></td><td>0.2</td><td>限制策略概率比的有效更新范围</td><td>KL、policy loss、行为退化</td></tr>
+      <tr><td><code>entropy_coef</code></td><td>0.01</td><td>鼓励探索</td><td>entropy 是否过早塌缩</td></tr>
+      <tr><td><code>learning_rate</code></td><td>1e-3</td><td>Adam 初始步长，随后按 KL 自适应</td><td>KL 与实际 lr</td></tr>
+      <tr><td><code>desired_kl</code></td><td>0.01</td><td>自适应学习率的目标变化尺度</td><td>KL 是否长期高于 .02 或低于 .005</td></tr>
+      <tr><td><code>learning epochs × minibatches</code></td><td>5 × 4</td><td>同一 rollout 产生 20 次优化 step</td><td>样本复用、KL 增长、墙钟</td></tr>
+    </tbody>
+  </table>
+
+  <h2>无需 GPU 的检查命令</h2>
+  <pre><code>uv run python code/inspect_task.py --list
+uv run python code/inspect_task.py \
+  --task Mjlab-Velocity-Flat-MicroDuck \
+  --section overview rewards curriculum algorithm
+uv run pytest tests/test_pure_functions.py -q
+uv run ruff check code tests</code></pre>
+
+  <h2>指标不要误读</h2>
+  <table>
+    <thead><tr><th>字段</th><th>可以说明</th><th>不能单独说明</th></tr></thead>
+    <tbody>
+      <tr><td>reward</td><td>当前环境评分的每步均值是否变化</td><td>目标动作是否真的发生、是否自然、是否泛化</td></tr>
+      <tr><td>entropy</td><td>动作分布的随机探索强弱</td><td>策略质量高低</td></tr>
+      <tr><td>KL</td><td>一次更新把策略推了多远</td><td>任务是否学会</td></tr>
+      <tr><td>value loss</td><td>critic 对当前 returns 的拟合误差</td><td>跨 curriculum、跨 reward 配方的绝对优劣</td></tr>
+      <tr><td>policy loss</td><td>当前 batch 上 surrogate objective 的优化状态</td><td>可直接比较的“成绩”</td></tr>
+      <tr><td>视频/关键帧</td><td>动作形态、投机行为、失败模式</td><td>大量随机条件下的成功率</td></tr>
+    </tbody>
+  </table>
+
+  <h2>一次实验的最小证据包</h2>
+  <ul class="checklist">
+    <li>精确 commit、task、seed 和完整命令</li>
+    <li>基线与实验使用相同评估指令</li>
+    <li>训练曲线与最终/中间 checkpoint</li>
+    <li>确定性 rollout 的数值结果和视频</li>
+    <li>事前预测、观察事实、是否支持假设</li>
+  </ul>
+  <p class="small">复制 <a href="../experiments/TEMPLATE.md">实验卡模板</a> 开始下一次实验。</p>
+</body>
+</html>

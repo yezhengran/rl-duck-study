@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>第 1 课：从参数追到实验问题与证据</title>
+  <link rel="stylesheet" href="../assets/course.css">
+</head>
+<body>
+  <nav><a href="index.html">课程首页</a> · <a href="../reference/glossary.html">术语表</a> · <a href="../reference/experiment-parameter-map.html">参数地图</a> · <a href="../experiments/TEMPLATE.md">实验卡模板</a></nav>
+  <p class="kicker">Lesson 0001 · 约 25 分钟</p>
+  <h1>从一个参数，追到它改变的问题和证据</h1>
+  <p class="lead">本课的胜利条件不是“记住超参数”，而是拿到任意一个参数后，能回答三句话：它在哪一层？它实际在哪里生效？改后应看到什么证据？</p>
+
+  <div class="callout"><strong>今天的产出：</strong>完成一张尚不消耗 GPU 的实验卡，并能向我解释为什么这个实验只改变了一个可归因因素。</div>
+
+  <h2>1. 先建立因果链，不要先找旋钮</h2>
+  <div class="flow" aria-label="实验因果链">
+    <div><strong>任务定义</strong>观测、动作、命令、奖励、终止</div>
+    <div><strong>数据生成</strong>N 个环境各采 24 步</div>
+    <div><strong>优势估计</strong>gamma=.99，lambda=.95</div>
+    <div><strong>PPO 更新</strong>clip、entropy、KL、lr</div>
+    <div><strong>评估证据</strong>曲线、成功率、rollout、视频</div>
+  </div>
+  <p>这条链决定“改哪里”。想让鸭子执行另一个目标，先改任务层；想验证同一目标下 PPO 是否更新过猛，才看算法层。把奖励和学习率一起改，即使变好也无法知道是谁造成的。</p>
+
+  <h3>当前仓库的四个入口</h3>
+  <table>
+    <thead><tr><th>先读</th><th>回答的问题</th><th>关键位置</th></tr></thead>
+    <tbody>
+      <tr><td><a href="../code/env.py"><code>code/env.py</code></a></td><td>这次跑哪个任务、多大规模、多久、哪个 seed？</td><td><code>TASK</code>、<code>NUM_ENVS</code>、<code>MAX_ITERATIONS</code>、<code>DuckEnv</code></td></tr>
+      <tr><td><a href="../code/model.py"><code>code/model.py</code></a></td><td>策略与 critic 长什么样，动作分布如何产生？</td><td><code>ActorCritic</code>、<code>compute_gae</code></td></tr>
+      <tr><td><a href="../code/train_v3_ppo.py"><code>code/train_v3_ppo.py</code></a></td><td>样本怎样收集、复用，loss 与日志怎样算？</td><td><code>sample_rollout</code>、<code>loss_for_batch</code>、<code>run_training</code></td></tr>
+      <tr><td><code>mjlab_microduck/tasks/*_env_cfg.py</code></td><td>任务的观测、奖励、课程表和随机化到底是什么？</td><td>安装依赖中的锁定上游源码</td></tr>
+    </tbody>
+  </table>
+
+  <div class="callout warning"><strong>运行时事实纠正：</strong><code>list_tasks()</code> 当前给出 45 个全局任务，其中包含 mjlab 自带任务；按名字筛选得到 33 个 MicroDuck 任务。读“任务总数”时必须先说清集合。</div>
+
+  <h2>2. 本地先做无 GPU 配置取证</h2>
+  <p>运行下面三条。第一条只列小鸭子任务；第二条展开当前行走任务；第三条验证回报、GAE、KL 调度等纯函数。</p>
+  <pre><code>uv run python code/inspect_task.py --list
+
+uv run python code/inspect_task.py \
+  --task Mjlab-Velocity-Flat-MicroDuck \
+  --section overview rewards curriculum algorithm
+
+uv run pytest tests/test_pure_functions.py -q</code></pre>
+
+  <p>从输出里找出以下五个事实，并先自己写答案：</p>
+  <ol class="checklist">
+    <li>物理步长、decimation 与控制频率之间是什么关系？</li>
+    <li>行走任务有多少个 reward term？总 reward 是哪几项构成的？</li>
+    <li><code>action_rate_l2</code> 的权重何时从 −0.1 变为 −1.0？</li>
+    <li>上游 runner 的 PPO 配方，与自写 <code>train_v3_ppo.py</code> 的核心值是否一致？</li>
+    <li>哪一份代码才决定你运行 <code>train_v3_ppo.py</code> 时真正生效的值？</li>
+  </ol>
+  <details><summary>核对答案</summary>
+    <p>物理步长 0.005 s，decimation=4，所以控制周期 0.02 s、频率 50 Hz。行走任务当前 16 个 reward term。<code>action_rate_l2</code> 在 curriculum 中分阶段变化，到 1500×24 个环境控制步时为 −1.0。上游 PPO 配方与自写 PPO 的核心默认值目前对齐；但运行自写脚本时，真正生效的是 <code>train_v3_ppo.py</code> 调用链中的值。</p>
+  </details>
+
+  <h2>3. 把“本地改—服务器跑”变成可复现实验</h2>
+  <p>Git 在这里不只是传文件，而是实验身份系统。服务器必须跑一个可命名的 commit，不能跑“我记得改过的那份”。</p>
+
+  <h3>本地：提交明确的一次实验改动</h3>
+  <pre><code>git status --short
+git diff --check
+uv run pytest tests/test_pure_functions.py -q
+
+# 只 add 这次实验相关文件，不用 git add -A
+git add path/to/changed_file.py experiments/EXP-0001-....md
+git commit -m "experiment: describe one controlled change"
+git push -u origin experiment/ppo-small</code></pre>
+
+  <h3>服务器：先锁定身份，再运行</h3>
+  <pre><code>git fetch origin
+git switch experiment/ppo-small
+git pull --ff-only
+git rev-parse HEAD
+
+uv sync --frozen
+uv run python code/inspect_task.py --section overview algorithm
+
+export RL_DUCK_CKPT_ROOT=/path/to/checkpoints
+export RL_DUCK_RESULT_ROOT=/path/to/results
+RL_DUCK_NUM_ENVS=256 \
+RL_DUCK_MAX_ITERATIONS=10 \
+RL_DUCK_SAVE_INTERVAL=5 \
+uv run python code/train_v3_ppo.py</code></pre>
+  <p>这 10 次迭代是<strong>管线冒烟</strong>：验证依赖、GPU、日志、checkpoint 和路径，不判断“学没学会”。完整训练再恢复任务所需规模和预算。速度行走的课程表到 2000 iterations 仍在改变，过短的 run 不能代表最终任务。</p>
+
+  <h2>4. 参数要和可证伪预测配对</h2>
+  <p>例如，不要写“试试把 entropy 调大”。应写：</p>
+  <div class="callout">
+    <p><strong>假设：</strong>当前策略在步态形成前 entropy 过早下降，探索不足。</p>
+    <p><strong>唯一改动：</strong><code>entropy_coef: 0.01 → 0.02</code>。</p>
+    <p><strong>事前预测：</strong>相同 seed、task、预算下，前期 entropy 更高；若假设成立，主任务行为出现得更早。若只有 entropy 更高而 rollout 没改善，则不支持假设。</p>
+    <p><strong>证据：</strong>entropy 曲线 + 相同 checkpoint 间隔的确定性 rollout + 相同指令下的视频。reward 只作辅助，因为它可能由正则项变化带动。</p>
+  </div>
+
+  <p>当前 <code>metrics.jsonl</code> 只记录总 reward、loss、value loss、policy loss、entropy、KL、mirror loss 和 lr，没有每个 reward term、episode length 或 success rate。因此它还不足以诊断“哪一项奖励被策略利用”。后续课程会先补诊断日志，再系统调奖励。</p>
+
+  <h2>5. 三个即时检查</h2>
+  <div class="quiz">
+    <p><code>MAX_ITERATIONS</code> 直接控制什么？</p>
+    <button data-answer="wrong" data-why="它由 NUM_ENVS 控制。">并行环境数量</button>
+    <button data-answer="correct" data-ok="对：它控制外层采样—更新循环次数。">训练迭代数量</button>
+    <button data-answer="wrong" data-why="它由环境动作空间决定。">动作输出维数</button>
+    <div class="feedback" aria-live="polite"></div>
+  </div>
+
+  <div class="quiz">
+    <p>自写 PPO 的 <code>clip_param</code> 属于哪一层？</p>
+    <button data-answer="wrong" data-why="奖励与终止才属于任务配置。">环境任务配置</button>
+    <button data-answer="wrong" data-why="隐藏层与动作分布结构属于模型层。">模型网络结构</button>
+    <button data-answer="correct" data-ok="对：它规定 PPO 如何限制策略更新。">算法优化配置</button>
+    <div class="feedback" aria-live="polite"></div>
+  </div>
+
+  <div class="quiz">
+    <p>判断“reward 上升代表目标行为改善”，哪种证据更可靠？</p>
+    <button data-answer="wrong" data-why="总分可能由正则项或奖励漏洞推动。">只看总奖上升</button>
+    <button data-answer="correct" data-ok="对：数值分项与可视行为需要相互印证。">结合分项录像</button>
+    <button data-answer="wrong" data-why="loss 是优化量，不是任务成绩。">只看损失下降</button>
+    <div class="feedback" aria-live="polite"></div>
+  </div>
+
+  <h2>课后任务：交一张实验卡</h2>
+  <ol class="checklist">
+    <li>复制 <a href="../experiments/TEMPLATE.md"><code>experiments/TEMPLATE.md</code></a>，命名为 <code>EXP-0001-你的问题.md</code>。</li>
+    <li>先不改代码，只提出一个单变量假设。建议从 <code>NUM_ENVS</code> 的吞吐实验，或 PPO 指标诊断开始；不要第一步就改奖励。</li>
+    <li>把配置检查输出中的五个答案，以及你选择该假设的理由发给我。我会逐项反馈并据此调整下一课难度。</li>
+  </ol>
+
+  <p><strong>主阅读：</strong><a href="https://github.com/pollen-robotics/microduck_rl/tree/5946fd9cdbc58956424420153e51975af3b30d77/src/mjlab_microduck/tasks">锁定提交的任务配置源码</a>。只读一个与你当前 task 对应的文件，沿“commands → rewards → curriculum”顺序读。</p>
+  <p class="small">任何一处不清楚，都直接追问教学助手。不要靠猜继续调参；把参数名、输出片段和你的当前解释一起发来，反馈会最快。</p>
+
+  <script src="../assets/quiz.js"></script>
+</body>
+</html>
